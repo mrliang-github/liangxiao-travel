@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "title": "离线示例 · 不是实际旅行建议",
+    "origin": "示例出发地",
+    "destinations": ["示例城市"],
+    "dateStart": "2099-05-01",
+    "dateEnd": "2099-05-02",
+    "days": 2,
+    "people": 3,
+    "currency": "CNY",
+    "updatedAt": "",
+    "note": "全部为虚构演示内容；价格、地点和日期均不可作为出行依据。",
+    "mapBoundary": "无真实坐标"
+  },
+  "flightsOrTrains": [
+    {"mode": "train", "from": "示例出发地", "to": "示例城市", "date": "2099-05-01", "no": "DEMO", "depart": "09:00", "arrive": "11:00", "price": null, "priceType": "未查到", "duration": "2 小时（演示）", "note": "虚构班次，仅用于演示页面。"}
+  ],
+  "hotels": [],
+  "days": [
+    {"date": "2099-05-01", "city": "示例城市", "title": "抵达与步行游览（演示）", "am": "抵达后放下行李。", "pm": "演示步行行程。", "evening": "演示晚餐安排。", "tickets": [{"name": "示例预约项", "price": null, "priceType": "未查到", "note": "请按真实景点核对。"}], "warnings": ["本页仅演示界面，没有真实查询数据。"], "photoSpots": [{"name": "示例拍摄点", "shot": "街景", "bestTime": "参考", "tip": "演示说明", "traffic": "未查到", "source": "仓库离线示例", "queriedAt": "", "confidence": "参考"}], "foods": [{"name": "示例餐厅", "dish": "示例菜名（参考）", "area": "示例区域", "avgPrice": null, "priceType": "未查到", "score": "未查到", "openHours": "未查到", "lat": null, "lng": null}], "mapPoints": []},
+    {"date": "2099-05-02", "city": "示例城市", "title": "自由活动与返程（演示）", "am": "演示自由活动。", "pm": "按真实班次安排返程。", "evening": "", "tickets": [], "warnings": [], "photoSpots": [], "foods": [], "mapPoints": []}
+  ],
+  "todos": [{"text": "核对真实日期、班次和预约要求", "done": false, "priority": "P0"}],
+  "budget": {
+    "comfort": {"title": "舒适档（未报价）", "items": {"交通": null, "住宿": null}, "total": null, "perPerson": null, "note": "等待实际查询。"},
+    "saver": {"title": "节省档（未报价）", "items": {"交通": null, "住宿": null}, "total": null, "perPerson": null, "note": "等待实际查询。"}
+  },
+  "source": {"tripQueryAt": "", "mapQueryAt": "", "photoQueryAt": "", "notes": ["虚构离线演示，不是查询结果。"]}
+}
