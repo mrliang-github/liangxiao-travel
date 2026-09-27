@@ -112,5 +112,5 @@ py -3 "$env:USERPROFILE\.workbuddy\skills\liangxiao-travel\scripts\check_deps.py
 - **日期不一致或没解析到表格？** 不要使用这份数据；核对请求日期、同程结果格式和是否已开放查询。酒店／景区没有日期列时会单独标明无法校验日期。
 - **地图空白？** 检查网络、Key 有效期及腾讯地图助手的配置；本地检查通过不保证 Key 在服务端仍可用。
 - **可以公开页面吗？** 1.2.0 默认生成无 Key 版，检查个人内容后可发布。显式 `--local-map` 版仍含 Key，不可公开；旧版 1.1.x 生成的 HTML 也需重新生成。
-- **下载按钮等于存进 ima 了吗？** 不等于。下载的是同源 Markdown；请在 WorkBuddy 中选中文档 → 上传到云端 → ima 知识库，完成官方授权和上传后再在手机查询。
+- **下载按钮等于存进 ima 了吗？** 不等于。下载的是同源 Markdown；分享页若限制下载，点击「复制行程文档」，按提示手动复制后让 WorkBuddy 保存为 `行程.md`。然后在 WorkBuddy 中选中文档 → 上传到云端 → ima 知识库，完成官方授权和上传后再在手机查询。
 - **升级后有问题？** 在 [Releases](https://github.com/mrliang-github/liangxiao-travel/releases) 下载对应版本，先备份本地修改，再按相同目录结构安装。反馈时只提供脱敏日志。

@@ -340,10 +340,11 @@ TPL = r'''<!DOCTYPE html>
 <dialog id="imaDialog" aria-labelledby="imaTitle">
   <div class="dialog-head"><h2 id="imaTitle">把行程存入腾讯 ima</h2><button type="button" class="close" data-close="imaDialog" aria-label="关闭 ima 说明">×</button></div>
   <div class="dialog-body"><p>行程文档与当前页面使用同一份资料，适合在手机上查阅和提问。</p>
-    <ol><li>下载行程文档，或使用 WorkBuddy 生成的同名 Markdown 文件。</li><li>在 WorkBuddy 中选中文档 → 上传到云端 → ima 知识库；首次使用按官方入口授权。</li><li>确认文档已存入并可检索后，在 ima 选择该知识库，询问某天的安排。</li></ol>
-    <div class="actions"><button type="button" class="btn primary" id="downloadDocument">下载行程文档 .md</button></div>
+    <ol><li>复制下方行程文档，在 WorkBuddy 粘贴并要求「把这份内容保存为行程.md」。已有生成的同名 Markdown 文件时可直接使用。</li><li>在 WorkBuddy 中选中文档 → 上传到云端 → ima 知识库；首次使用按官方入口授权。</li><li>确认文档已存入并可检索后，在 ima 选择该知识库，询问某天的安排。</li></ol>
+    <div class="actions"><button type="button" class="btn primary" id="copyDocument">复制行程文档</button><button type="button" class="btn" id="downloadDocument">下载行程文档 .md</button></div>
+    <div id="documentTextBox" class="hidden"><label for="documentText">行程文档 · 可全选复制</label><textarea id="documentText" class="prompt" readonly spellcheck="false"></textarea></div>
     <p class="feedback" id="documentStatus" role="status"></p>
-    <p class="t3">此按钮仅下载文档，不代表已上传 ima。网页待办勾选保存在当前浏览器，不会同步到知识库。资料不会自动刷新。</p>
+    <p class="t3">WorkBuddy 分享页可能限制下载，可用复制方式保存。复制或下载不代表已上传 ima。网页待办勾选保存在当前浏览器，不会同步到知识库。资料不会自动刷新。</p>
     <a class="muted-link" href="https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Knowledge-Base/IMA%20Knowledge%20Base/01-Workbuddy-IMA-Basic-Guide" target="_blank" rel="noopener noreferrer">查看官方保存流程 ↗</a>
   </div>
 </dialog>
@@ -431,12 +432,20 @@ function bindOnboarding(){
     try{await navigator.clipboard.writeText(prompt.value);status.textContent='已复制。切到 WorkBuddy，粘贴到新任务后发送。';}
     catch(e){prompt.focus();prompt.select();status.textContent='浏览器未允许自动复制。文字已选中，请按 Ctrl+C 或 ⌘C 复制。';}
   };
+  var documentText=document.getElementById('documentText');
+  documentText.value=TRIP_MARKDOWN;
+  document.getElementById('copyDocument').onclick=async function(){
+    document.getElementById('documentTextBox').classList.remove('hidden');
+    var status=document.getElementById('documentStatus');
+    try{await navigator.clipboard.writeText(documentText.value);status.textContent='已复制行程文档。在 WorkBuddy 粘贴，并要求保存为行程.md。';}
+    catch(e){documentText.focus();documentText.select();status.textContent='文字已选中，请按 Ctrl+C 或 ⌘C 复制；在手机上可长按全选复制。随后粘贴到 WorkBuddy 并要求保存为行程.md。';}
+  };
   document.getElementById('downloadDocument').onclick=function(){
     var url=URL.createObjectURL(new Blob([TRIP_MARKDOWN],{type:'text/markdown;charset=utf-8'}));
     var a=document.createElement('a');a.href=url;
     a.download='松鼠旅行官-'+String(TRIP.meta.title||'我的行程').replace(/[\\/:*?"<>|]/g,'-').slice(0,70)+'.md';
     document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);
-    document.getElementById('documentStatus').textContent='已发起文档下载。接下来在 WorkBuddy 上传至 ima。';
+    document.getElementById('documentStatus').textContent='已请求下载。若没有出现文件，请使用「复制行程文档」保存；以浏览器实际下载结果为准。';
   };
 }
 
