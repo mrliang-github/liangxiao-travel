@@ -1,5 +1,6 @@
 {
   "meta": {
+    "isExample": true,
     "title": "离线示例 · 不是实际旅行建议",
     "origin": "示例出发地",
     "destinations": ["示例城市"],

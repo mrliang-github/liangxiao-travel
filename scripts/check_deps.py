@@ -1,18 +1,20 @@
 # -*- coding: utf-8 -*-
-"""运行时依赖检查。缺什么只提示什么，不打印任何 Key 原文。
+"""松鼠旅行官首次启用。只输出当前一步，不回显凭据。
 
-退出码：
-  0  同程已授权 + 腾讯地图 Key 可用，可以开始规划
-  1  缺依赖，stdout 是给用户看的引导文案（Agent 必须原样展示，然后停）
+0 = 可开始规划（查看 mode / capabilities）；1 = 等待配置；2 = 状态文件错误。
+--state 显式保存到任务目录；恢复时永远重新检测，不能信任上次的 ready 状态。
 """
 from __future__ import annotations
 
 import json
+import argparse
 import os
 import shutil
 import subprocess
 import sys
 from datetime import date
+from pathlib import Path
+import tempfile
 
 SKILL_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -181,29 +183,122 @@ def check_tmap():
     }
 
 
-def main():
-    items = [check_tongcheng(), check_tmap()]
-    missing = [x for x in items if not x.get('ok')]
-    if not missing:
-        print('OK\ntongcheng=authorized\ntmap=key-ready')
-        return 0
+BRIEF_FIELDS = ('origin', 'destinations', 'dateStart', 'dateEnd', 'people', 'budget', 'preferences')
 
-    lines = [
-        'liangxiao-travel 还不能开始规划。下面缺的依赖需要你自己完成，我无法替你点授权或申请 Key。',
-        '',
-        '缺了：',
-    ]
-    for i, m in enumerate(missing, 1):
-        lines.append('%d. %s' % (i, m.get('title') or m['id']))
-    lines.append('')
-    for m in missing:
-        lines.append('—— %s ——' % (m.get('title') or m['id']))
-        lines.append(m.get('how') or '')
-        lines.append('')
-    lines.append('做完后直接回「继续」，我会再检查一次。两样都过才会开始查票、出行程页。')
-    lines.append('宿主必须是 WorkBuddy。Cursor / 纯 Claude 里同程连接器不可用。')
-    print('\n'.join(lines).rstrip())
-    return 1
+
+def clean_brief(value):
+    if not isinstance(value, dict):
+        raise ValueError('需求必须是 JSON 对象')
+    # 白名单只保留旅行需求，不把凭据、授权结果或任意状态字段写回磁盘。
+    result = {}
+    for key in BRIEF_FIELDS:
+        item = value.get(key)
+        if item is None:
+            continue
+        if key == 'destinations':
+            if not isinstance(item, list) or any(not isinstance(x, str) for x in item):
+                raise ValueError('destinations 必须是文字列表')
+            item = [x[:200] for x in item[:20]]
+        elif key == 'people':
+            if type(item) is not int or not 1 <= item <= 100:
+                raise ValueError('people 必须是 1 到 100 的整数')
+        elif not isinstance(item, (str, int, float)) or isinstance(item, bool):
+            raise ValueError('需求字段格式不正确')
+        elif isinstance(item, str):
+            item = item[:2000]
+        result[key] = item
+    return result
+
+
+def read_state(path):
+    if not path:
+        return {}
+    target = Path(path)
+    if target.name != 'onboarding-state.json' or target.is_symlink():
+        raise ValueError('状态文件必须命名为 onboarding-state.json，且不能是符号链接')
+    if not target.exists():
+        return {}
+    data = json.loads(target.read_text(encoding='utf-8'))
+    if not isinstance(data, dict) or data.get('schemaVersion') != 1:
+        raise ValueError('状态文件版本不支持，原文件已保留')
+    return data
+
+
+def save_state(path, state):
+    if not path:
+        return
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    name = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=target.parent,
+                                         prefix='.onboarding-', delete=False) as stream:
+            name = stream.name
+            json.dump(state, stream, ensure_ascii=False, indent=2, allow_nan=False)
+            stream.write('\n')
+        os.replace(name, target)
+    finally:
+        if name and os.path.exists(name):
+            os.unlink(name)
+
+
+def onboarding_status(mode, brief):
+    # 基础模式不触碰凭据或连接器。用户可以随时切回 guided 重新检查增强能力。
+    if mode == 'basic':
+        return {'schemaVersion': 1, 'mode': mode, 'stage': 'plan', 'brief': brief,
+                'capabilities': {'map': False, 'tongcheng': False},
+                'message': '基础攻略已就绪。继续使用已保存的旅行需求；缺必填项时一次补齐。'
+                           '仅整理公开资料，不标实查票价、不编坐标；以后可再开通增强查询。'}
+    map_skill = bool(_tmap_skill_dirs())
+    map_key = bool(load_tmap_key()[0])
+    tongcheng = check_tongcheng()
+    capabilities = {'map': map_skill and map_key, 'tongcheng': bool(tongcheng['ok'])}
+    if not map_skill:
+        stage = 'map_skill'
+        message = ('第 1 步：安装腾讯地图助手。\n'
+                   '在 WorkBuddy 技能市场搜索「腾讯地图助手」并安装官方版本。\n'
+                   '完成后回复「继续」，接着进行地图开通。无需寻找或填写 Key。')
+    elif not map_key:
+        stage = 'map_key'
+        message = ('第 2 步：开通地图查询。\n'
+                   '接下来由已安装的官方腾讯地图助手引导：阅读并同意服务协议 → 手机验证 → 自动保存 Key。\n'
+                   '无需去控制台找 Key，也不要把 Key 复制到网页。由本人完成协议确认和手机验证。')
+    elif not tongcheng['ok']:
+        stage = 'tongcheng'
+        message = '第 3 步：连接同程旅行。地图配置已检测到。\n' + tongcheng['how']
+    else:
+        stage = 'plan'
+        message = ('配置检查通过，开始规划。沿用已有需求，不重复提问。\n'
+                   '这是本地授权与有效期检查；实际查询失败时只处理对应服务，不能把失败当查询结果。')
+    if stage != 'plan':
+        message += '\n也可以回复「先做基础攻略」，暂时跳过增强查询；不会生成未经查询的票价或坐标。'
+    return {'schemaVersion': 1, 'mode': mode, 'stage': stage, 'brief': brief,
+            'capabilities': capabilities, 'message': message}
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description='松鼠旅行官 · 首次启用与恢复')
+    parser.add_argument('--state', help='当前任务的 outputs/my-trip/onboarding-state.json')
+    parser.add_argument('--brief', help='旅行需求 JSON 文件，只接收白名单字段')
+    parser.add_argument('--mode', choices=('guided', 'basic'), help='用户选择后切换；默认恢复已有选择')
+    parser.add_argument('--json', action='store_true', help='给 Agent 的结构化状态，不含 Key 或 token')
+    args = parser.parse_args(argv)
+    try:
+        previous = read_state(args.state)
+        brief = clean_brief(previous.get('brief', {}))
+        if args.brief:
+            brief.update(clean_brief(json.loads(Path(args.brief).read_text(encoding='utf-8'))))
+        mode = args.mode or previous.get('mode', 'guided')
+        if mode not in ('guided', 'basic'):
+            raise ValueError('状态中的模式不支持')
+        state = onboarding_status(mode, brief)
+        save_state(args.state, state)
+    except (OSError, ValueError, TypeError):
+        # 不回显原始 JSON、路径内容或第三方错误，避免把混入的秘密写进日志。
+        print('无法读取或保存启用状态。请检查任务文件格式与权限，原文件未被主动清理。', file=sys.stderr)
+        return 2
+    print(json.dumps(state, ensure_ascii=False, indent=2) if args.json else state['message'])
+    return 0 if state['stage'] == 'plan' else 1
 
 
 if __name__ == '__main__':
