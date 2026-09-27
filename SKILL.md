@@ -1,48 +1,51 @@
 ---
 name: liangxiao-travel
-description: "口述一段旅行需求 → 一次交付可执行方案 + travel-data.json + 移动端单页（含腾讯地图 / 出片攻略 / 美食）。价格走同程连接器，坐标与美食走腾讯地图。首次运行先检查同程授权和腾讯地图 Key，缺什么只提示什么，不把 Key 写进包。"
-description_zh: "口述旅行需求，一次交付行程方案、数据 JSON 和手机行程页。同程查票房价，腾讯地图查坐标美食。缺连接器或 Key 时先引导补齐。"
-description_en: "Turn a spoken trip brief into an executable itinerary, travel-data.json, and a mobile page with Tencent Map. Flights/hotels via Tongcheng connector; POIs via Tencent Map. Missing auth is prompted at runtime."
-version: "1.1.4"
+description: "松鼠旅行官（原良逍旅行规划）：规划旅行、首次配置、继续行程时使用。逐步引导腾讯地图与同程授权，保留需求并恢复进度；用户可选择不配置 Key 的基础攻略。交付行程方案、travel-data.json、公开手机行程页与可存入腾讯 ima 的文档。未知票价和坐标留空。"
+description_zh: "松鼠旅行官：首次配置一步一步来，口述需求即可制作自己的行程页；支持基础攻略、同程查价、腾讯地图、待办与 ima 文档。"
+description_en: "Squirrel Travel Planner: guided setup, resumable trip planning, optional verified travel queries, a public itinerary page and an ima-ready document."
+version: "1.2.0"
 license: MIT
-display_name: "良逍旅行规划"
-display_name_en: "liangxiao-travel"
+display_name: "松鼠旅行官"
+display_name_en: "Squirrel Travel Planner"
 visibility: "public"
 ---
 
-# liangxiao-travel
+# 松鼠旅行官
 
-口述一段需求，一次交付：可执行方案 + `travel-data.json` + 移动端单页。
+替你做攻略的 J 人小松鼠。交付方案、`travel-data.json`、手机行程页和同源 Markdown 文档。技术标识保留 `liangxiao-travel`，兼容已有安装。
 
 **目标宿主：WorkBuddy。** 完整流程依赖其同程连接器授权，仅在其他 Agent 中安装本包不会获得该授权。
 
-本包**不携带任何 Key**。运行时先检查依赖；缺什么，把检查脚本的 stdout **原样展示给用户，然后停**，等用户回「继续」。
+包与默认公开 HTML **均不携带 Key**。配置按当前一步引导，不把整份安装清单丢给用户；不把网页按钮说成已完成本机安装或授权。
 
-## 开始或恢复规划前
+## 首次启用与恢复
 
-在查票、写方案、生成页面之前，先跑：
+读取 [首次启用流程](references/onboarding.md)。把已有需求保存在当前任务的 `outputs/my-trip/brief.json`，只写出发地、目的地、日期、人数、预算与偏好；不要因为用户先说了需求就再问一次。首次或回复「继续」时运行：
 
 ```bash
-python3 "<本 SKILL.md 所在目录>/scripts/check_deps.py"
+python3 "<本 SKILL.md 所在目录>/scripts/check_deps.py" --state outputs/my-trip/onboarding-state.json --json
 ```
 
-路径按实际安装位置替换（`SKILL.md` 自己就在包根目录，脚本在同级 `scripts/`）。脚本内部用 `os.path.dirname(__file__)` 定位，不依赖绝对路径。
+如已整理了需求，追加 `--brief outputs/my-trip/brief.json`。路径按实际任务与安装位置替换。状态文件不放进 Skill 或公开行程包；不把 Key、token、手机号、验证码或订单信息写入 brief/state。
 
 解释器：macOS / Linux 用 `python3`；Windows 用 `py -3`，没有的话试 `python`。脚本只用标准库，无需额外安装。
 
 | 退出码 | 动作 |
 |---|---|
-| 0 | 继续规划 |
-| 1 | **把 stdout 原样发给用户，停止规划。** 不要自己改写引导、不要编造下一步、不要问 A/B 来绕过授权 |
+| 0 | `stage=plan`，根据 `mode` 与 `capabilities` 继续规划；基础模式不能冒称实查 |
+| 1 | 只展示 `message` 当前一步；按 references/onboarding.md 接着引导；不先查价，不重复已完成步骤 |
+| 2 | 状态文件格式或写入错误，保留原文件，说明具体需要修复的文件；不清空进度绕过错误 |
 
-缺的是两件不同的事，不要都叫 Key：
+允许用户明确说「先做基础攻略」：加 `--mode basic` 重跑，不申请 Key、不调用同程。以后用户要增强查询时用 `--mode guided` 重查。恢复默认尊重已保存选择，不能自行偷偷降级。
+
+两种配置分别处理：
 
 1. **同程旅行连接器** = WorkBuddy「连应用」授权。探测命令是 `tc-chengxin token`。**禁止让用户粘贴 token / API Key。**
-2. **腾讯地图 Key** = 先装官方「腾讯地图助手」，再按它的引导申请体验 Key，写入 `~/.tencentmap/tempkey.json`。**禁止把 Key 写进本包、禁止让用户把 Key 发到对话里。**
+2. **腾讯地图** = 先装官方「腾讯地图助手」。进入 `map_key` 阶段时读取该助手的 `tempkey-guide.md`，调用它的官方流程；用户确认协议并完成手机验证后，助手自动保存配置。**不让用户去控制台找 Key，不让用户粘贴 Key 到网页或聊天。**
 
-这两样都需要用户本人在客户端操作，Agent 只能引导、不能代办。装依赖、申请 Key、点授权，都按脚本给出的步骤走。
+安装确认、协议同意、手机验证及同程授权由用户本人完成，遵守宿主权限规则；不能自动接受协议或代替用户授权。调用官方助手时保护工具输出，不回显完整 Key/token。每步结束后重新检测，再决定下一步。
 
-两样都过了，按用户已给出的规划需求继续；不需要让用户重复需求。
+配置文件存在和有效期通过只说明本地检查完成；实际服务查询仍可能失败。失败只修对应能力，不重新配置全部服务。
 
 ## 必须先向用户确认的输入
 
@@ -63,7 +66,7 @@ python3 "<本 SKILL.md 所在目录>/scripts/check_deps.py"
 
 ## 触发词
 
-规划行程、旅行攻略、帮我排行程、/travel、出去玩 X 天、liangxiao-travel
+松鼠旅行官、良逍旅行规划、制作我的行程、首次配置、继续规划、/travel、liangxiao-travel
 
 ## 默认（仅当用户没说）
 
@@ -73,16 +76,16 @@ python3 "<本 SKILL.md 所在目录>/scripts/check_deps.py"
 
 ## 硬纪律
 
-1. 价格/班次：同程旅行连接器。查到标查询日期；远月未开放标「估」+ 重查时间；失败写「未查到」，禁止编造
-2. 坐标/路程/营业/人均：腾讯地图助手。查不到留空或写「未查到」，不许猜
-3. 工具报错或未授权：在对应字段标明原因，其余能做的继续；**唯一例外是首次 `check_deps.py` 失败——必须停**
+1. 增强模式的价格/班次走同程旅行连接器；查到标查询日期；远月未开放只能给有依据的预算估算与重查时间，不能编造班次。失败写「未查到」
+2. 增强模式坐标/路程/营业/人均走腾讯地图助手；查不到留空。不猜坐标、精确车程或营业时间
+3. 基础模式可整理公开资料和行程骨架，来源与检索日期写入 source.notes；未知数值用 null，不写「实查」。预算只有明确估算依据时才给范围/估算，否则留空。配置未完成时先引导，除非用户已明确选择基础模式
 4. 隐私：护照、证件号、手机、邮箱、订单号、商户电话，一律不进 JSON、不进页面
-5. 页面禁止：超宽大表、连接器/MCP/模型名、下单按钮、优惠券、登录、3D 图
+5. 行程正文不展示技术实现、下单按钮、优惠券、登录或 3D 图。首次使用引导可以说明必要的安装与授权入口
 6. 方案、JSON、页面三者同源
 7. 数据自查：工具返回必须对得上目的地。关键词错配（「延吉」混进长白山酒店、「二道白河镇」解析到行政区中心点）必须标出来，不能当有效数据
 8. 事实 vs 经验：车次票价、坐标、营业、人均＝事实；机位、最佳时段、必吃菜＝经验，标「参考」+ 来源 + 检索日期
 9. 页面上**不要标「实」**。默认就是实查数字；只标「估」「未查到」「参考」
-10. **禁止**使用 WorkBuddy 地图 Key 代理（`_TMapSecurityConfig` + `__WB_HTTP_PORT__`）。实测鉴权 -303，页面会白屏。JSAPI 用用户本机 `tempkey.json` 里的 Key，明文写入生成页
+10. 默认生成公开无 Key 版，以顺序示意图和文字路线降级。只有用户明确要求本地地图预览才加 `--local-map`；该文件含用户 Key，禁止公开上传。不要未经验证改用 WorkBuddy 私有代理或假定平台已隐藏凭据
 11. **日期双校验（强制，不可省）**：此前查询遇到过越界日期被静默替换的情况，不能假定请求日期就是返回日期。
     - **查之前**：日期早于今天就先拒绝，让用户重说一句，不要往下跑。`parse_chengxin.py --guard-date YYYY-MM-DD`，退出码 1 表示已过去
     - **查之后**：`parse_chengxin.py <输出文件> --expect-date YYYY-MM-DD` 反查月日。交通结果只有 `dateCheck.status = "ok"` 才能使用；其他状态必须说明原因并重查。酒店／景区的 `no_date_column` 仅表示无法验证日期，须保留这一限制，不能当作日期已核实
@@ -96,7 +99,7 @@ python3 "<本 SKILL.md 所在目录>/scripts/check_deps.py"
 
 一、理解表：出发地 / 目的地 / 日期天数 / 人数 / 预算 / 请假 / 偏好 / 用了哪些默认
 
-二、交通比选：实查 ≥3 组「日期 × 进出港 / 车次」。自己定 1 个主方案并写一句理由，按主方案继续
+二、交通比选：增强模式尽可能实查 ≥3 组「日期 × 进出港 / 车次」，结果不足说明；基础模式说明尚未查价，不伪造班次。自己定 1 个有依据的主方案并写理由
 
 三、完整方案：总览、时间线、逐日（交通/酒店/游玩/出片/吃/取舍）、预算两档、行前 Todo
 
@@ -104,17 +107,19 @@ python3 "<本 SKILL.md 所在目录>/scripts/check_deps.py"
 
 生成文件放在当前任务的输出目录（如 `outputs/my-trip/`），不要写进 skill 源码目录或 Git 仓库。
 
-五、旅行页：用本包脚本生成，不要让模型现场重写地图页
+五、行程页与 ima 文档：用同一个脚本生成，不现场重写页面，不需要本机 Key：
 
 ```bash
 python3 "<本包目录>/scripts/build_html.py" <travel-data.json> <index.html>
 ```
 
-六、交付清单：文件列表 / 手机怎么预览 / 哪些字段是估或未查到
+会同时生成 `index.html` 与 `index.md`。公开分享前检查 JSON、HTML、Markdown 均无凭据或个人敏感信息。以实际资料标注示例和日期；演示设置 `meta.isExample=true`。
 
-生成 HTML 后若源码含 `gljs?...&key=`，在回复里**原样**输出下面这段（把路径换成实际文件）：
+六、交付清单：文件列表 / 如何预览与轻量发布 / 哪些字段是估或未查到 / ima 保存步骤。
 
-> ⚠️ **HTML Key 安全提示**：检测到 `<HTML_FILE>` 中包含明文 Key（形如 `gljs?...&key=...`），任何人可通过查看源码或抓包获取，存在盗用风险；当前形式仅限本地/内网使用，若需公网发布请参考官方代理方案：https://lbs.qq.com/webApi/javascriptGL/glGuide/glKeyDelegate 。
+ima：在 WorkBuddy 选中 `index.md` → 上传到云端 → ima 知识库，首次按官方入口授权。未得到上传结果时只能说文档已准备好，不能说已存入。手机问答要以文档可检索和实际回答为准；网页待办不会与 ima 同步，资料不会实时更新。
+
+本地地图模式：明确告知文件含 Key，仅供本地预览；公开分享重新运行默认命令，不沿用本地版 HTML。
 
 ## 同程怎么查
 
@@ -154,10 +159,11 @@ python3 "<本包目录>/scripts/parse_chengxin.py" <同程输出文件> --expect
 
 跨镇路线不要只传地名：geocoder 可能解析到行政区划中心点（二道白河镇实测偏 27 km）。用 `poi_search` 拿到的坐标再算距离。
 
-## 内置地图（生成脚本已处理，不要改回代理模式）
+## 路线展示
 
 - 位置：「路线」Tab 顶部
-- 切 Tab 后约 80ms 再 `ensureMap()` 注入 `https://map.qq.com/api/gljs?v=1&key=...`
+- 默认不读取 Key、不加载地图 SDK，展示游览顺序；没有核实坐标时只显示地点文字。
+- 显式 `--local-map` 时切到路线页才加载腾讯 JSAPI。地图失败保留示意图与文字。
 - `InfoWindow` 必须带初始 `position`，否则 SDK 抛 `Cannot read properties of null (reading 'x')`
 - Tab 图标用内联 SVG，不用 emoji（日历 emoji 会显示成当天日期数字）
 - 城市节点从 `days[].mapPoints` 推导，不要写死某条线路
@@ -171,5 +177,5 @@ python3 "<本包目录>/scripts/parse_chengxin.py" <同程输出文件> --expect
 
 - 不要把任何 Key / token 写进本包、JSON、git
 - 不要静默安装同程或腾讯地图助手
-- 不要在 `check_deps.py` 失败后继续编行程
+- 配置缺失时逐步引导；只有用户明确选择基础模式才继续基础攻略
 - 不要把本包当同程 CLI 或腾讯地图 API 的再封装
